@@ -12,15 +12,25 @@ npm start
 
 Ou `node server.js`. Abra **http://localhost:3000** no computador transmissor. Clique em **Iniciar transmissão**, permita a captura da tela e envie o link da sala aos espectadores.
 
-### Instalação automática no Windows
+## Aplicativo para Windows 10 e 11 (64 bits)
 
-1. Extraia todo o arquivo ZIP.
-2. Abra a pasta `LiveForge` e execute **`instalar.bat`** com um duplo clique.
-3. Caso o Node.js 20+ não esteja disponível, o instalador tenta instalar a versão LTS usando o **winget** (o Windows pode solicitar confirmação ou privilégios). Se o winget não estiver disponível, ele abre a página oficial do Node.js para instalação manual.
-4. O instalador tenta criar um atalho **LiveForge Studio** na área de trabalho. Ao final, escolha se deseja iniciar o site.
-5. Para iniciar novamente depois, use o atalho ou o arquivo `iniciar_windows.bat`. O site fica disponível em **http://localhost:3000** enquanto o servidor estiver em execução.
+1. Abra a [página de builds para Windows](https://github.com/ailtonXL/LiveShare/actions/workflows/windows-desktop.yml) com sua conta do GitHub.
+2. Abra uma execução concluída e baixe **LiveForge-Studio-Windows-x64** na seção **Artifacts**.
+3. Extraia o ZIP e execute **LiveForge-Studio-Setup-x64.exe**. Abra **LiveForge Studio** pelo menu Iniciar.
 
-**Observação:** o projeto não exige `npm install`: ele usa apenas recursos nativos do Node.js. O instalador não configura um serviço do Windows, HTTPS nem acesso remoto público automaticamente. Para compartilhar a transmissão com outros dispositivos fora de `localhost`, consulte a seção de publicação abaixo.
+O aplicativo inclui o runtime e inicia a sinalização ao abrir. Escolha uma tela ou janela e copie o link da sala. Na mesma rede local, os espectadores abrem esse link no navegador. O computador transmissor precisa permanecer ligado e com o aplicativo aberto. O Firewall do Windows pode pedir permissão para receber conexões na rede privada.
+
+Por padrão, o aplicativo escolhe uma porta disponível e usa o primeiro endereço IPv4 de rede para gerar o link. Para publicar a aplicação desktop na internet, fixe a porta com `PORT`, configure o proxy HTTPS para essa porta e defina `LIVEFORGE_PUBLIC_URL` como a origem pública do proxy. Use TURN quando a conexão P2P exigir retransmissão. O áudio do sistema no aplicativo Windows é oferecido ao compartilhar uma tela inteira.
+
+Para desenvolver ou gerar um instalador no Windows, use Node.js 20 ou mais recente:
+
+```bash
+npm ci
+npm run desktop
+npm run dist:win
+```
+
+O instalador gerado fica em `dist/LiveForge-Studio-Setup-x64.exe`. O site original continua disponível via `npm start`. Os arquivos BAT existentes iniciam essa versão web.
 
 ## Opções de ambiente
 

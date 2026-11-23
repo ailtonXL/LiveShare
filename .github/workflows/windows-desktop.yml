@@ -1,0 +1,33 @@
+name: Build LiveForge for Windows
+
+on:
+  push:
+    branches: [main, desktop/windows]
+    paths:
+      - .github/workflows/windows-desktop.yml
+      - desktop/**
+      - public/**
+      - server.js
+      - package.json
+      - package-lock.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiveForge-Studio-Windows-x64
+          path: dist/LiveForge-Studio-Setup-x64.exe
+          if-no-files-found: error
