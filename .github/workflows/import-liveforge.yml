@@ -16,6 +16,7 @@ jobs:
         run: |
           set -euo pipefail
           cat liveforge-upload/part-* | base64 --decode > /tmp/liveforge-upload.tar.xz
+          echo "b579acd4f00979c090bb3b7274cd03747c0da2c4bb7bcb03d227ea84a671053d  /tmp/liveforge-upload.tar.xz" | sha256sum -c -
           mkdir -p /tmp/liveforge-extract
           tar -xJf /tmp/liveforge-upload.tar.xz -C /tmp/liveforge-extract
           cp -a /tmp/liveforge-extract/LiveForge/. .
