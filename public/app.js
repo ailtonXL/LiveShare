@@ -231,8 +231,9 @@ async function startLive() {
     if($('audioToggle').checked&&!stream.getAudioTracks().length) notify('A captura começou sem áudio: o navegador ou a fonte não oferecem áudio do sistema.');
     else notify('Transmissão iniciada! Compartilhe o link da sala.');
   } catch(e) {
-    if(e.name!=='NotAllowedError') notify(e.message||'Falha ao compartilhar a tela.',true);
-    else notify('Compartilhamento cancelado pelo usuário.');
+    const dismissed=e.name==='NotAllowedError'||(window.liveForgeDesktop&&e.message==='Invalid capture constraints');
+    if(dismissed) notify('Compartilhamento cancelado pelo usuário.');
+    else notify(e.message||'Falha ao compartilhar a tela.',true);
     if(host.stream&&!host.live) host.stream.getTracks().forEach(t=>t.stop());
   } finally {host.starting=false;showHostUi();}
 }

@@ -85,13 +85,13 @@ async function start() {
   let picking = false;
   session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
     if (picking || !request.userGesture || !request.videoRequested ||
-        request.securityOrigin !== localOrigin || request.frame !== win.webContents.mainFrame) {
-      callback({});
+        new URL(request.securityOrigin).origin !== localOrigin || request.frame !== win.webContents.mainFrame) {
+      callback(null);
       return;
     }
 
     picking = true;
-    let selection = {};
+    let selection = null;
     try {
       const sources = await desktopCapturer.getSources({
         types: ['screen', 'window'],
@@ -100,7 +100,7 @@ async function start() {
       if (sources.length && !win.isDestroyed()) {
         const source = await pickSource(win, sources);
         if (source) {
-          selection.video = source;
+          selection = { video: source };
           if (process.platform === 'win32' && request.audioRequested && source.id.startsWith('screen:')) {
             selection.audio = 'loopback';
           }
