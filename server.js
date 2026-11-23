@@ -145,7 +145,10 @@ async function handler(req,res) {
 }
 const server=http.createServer((req,res)=> { handler(req,res).catch(e=> {console.error(e);send(res,500,{error:'Erro interno'});}); });
 server.keepAliveTimeout=65_000;
-server.listen(PORT,'0.0.0.0',()=>console.log(`LiveForge disponível em http://localhost:${PORT}`));
+if (require.main === module) {
+  server.listen(PORT, '0.0.0.0', () => console.log(`LiveForge disponível em http://localhost:${PORT}`));
+}
+module.exports = server;
 setInterval(()=>{
   const now=Date.now();
   for(const [id,r] of rooms) {

@@ -26,7 +26,7 @@ async function api(url, data) {
 function topLive(live) { $('topStatus').className='pill '+(live?'pill-live':'pill-idle');$('statusText').textContent=live?'AO VIVO':'OFFLINE'; }
 function formatTime(total) { total=Math.max(0,Math.floor(total));const h=String(Math.floor(total/3600)).padStart(2,'0'),m=String(Math.floor(total/60)%60).padStart(2,'0'),s=String(total%60).padStart(2,'0');return `${h}:${m}:${s}`; }
 function prettyCodec(mime) { if (!mime) return '—';return mime.split('/').pop().toUpperCase().replace('H265','H.265').replace('H264','H.264'); }
-function hostLink() {return `${location.origin}/?watch=${encodeURIComponent(host.roomId)}`;}
+function hostLink() {return `${window.liveForgeDesktop?.shareOrigin || location.origin}/?watch=${encodeURIComponent(host.roomId)}`;}
 function maxHeight() { const q=$('qualitySelect').value;return q==='auto'||q==='native'?Infinity:Number(q); }
 function targetFps() {return $('fpsSelect').value==='auto'?60:Number($('fpsSelect').value);}
 function estimateBitrate(height,fps,codec) {
@@ -50,7 +50,10 @@ function updateCaptureUi() {
 function hardwareUi() {
   const platform=navigator.userAgentData?.platform||navigator.platform||'Navegador';
   $('platformName').textContent=platform.replace('Win32','Windows').replace('MacIntel','macOS');
-  $('hardwareSummary').textContent='Codificação gerenciada pelo navegador';
+  $('hardwareSummary').textContent=window.liveForgeDesktop ? 'Codificação gerenciada pelo aplicativo' : 'Codificação gerenciada pelo navegador';
+  if (window.liveForgeDesktop) {
+    $('capturePermission').textContent='Escolha a tela ou janela que deseja compartilhar.';
+  }
   const chips=$('codecChips');
   chips.replaceChildren();
   for(const code of ['AV1','H265','H264','VP9','VP8']) {
