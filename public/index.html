@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0d16">
+  <meta name="description" content="LiveForge — compartilhe sua tela em alta resolução com WebRTC, codec e FPS adaptáveis.">
+  <title>LiveForge — Estúdio de transmissão</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="LiveForge início"><span class="brand-mark"><svg viewBox="0 0 36 36" fill="none"><path d="m9 22 7-12 4 9 7-5-5 13H10Z" fill="currentColor"/><circle cx="28" cy="8" r="3" fill="#82F5C2"/></svg></span><span>LIVE<span class="brand-accent">FORGE</span><small>STUDIO</small></span></a>
+      <div class="topbar-right"><div class="privacy"><span class="privacy-dot"></span> WEBRTC · BAIXA LATÊNCIA</div><span class="top-divider"></span><div class="pill pill-idle" id="topStatus"><span class="status-dot"></span><span id="statusText">OFFLINE</span></div></div>
+    </header>
+
+    <main id="studioView">
+      <section class="pagehead"><div><div class="eyebrow"><span class="eyebrow-line"></span> SEU ESPAÇO DE TRANSMISSÃO</div><h1>Seu estúdio. <span class="gradient-text">Suas regras.</span></h1><p>Compartilhe sua tela com qualidade inteligente e controle total.</p></div><div class="hardware-chip"><span class="hardware-icon">◈</span><span><strong id="platformName">Detectando dispositivo</strong><small id="hardwareSummary">Analisando suporte do navegador</small></span></div></section>
+      <div class="studio-layout">
+        <section class="main-pane">
+          <div class="panel video-panel">
+            <div class="panel-heading"><span class="panel-heading-title"><span class="tiny-indicator"></span> PRÉ-VISUALIZAÇÃO</span><span class="preview-meta" id="previewMeta">SEM FONTE</span></div>
+            <div class="video-frame" id="videoFrame">
+              <video id="preview" autoplay muted playsinline></video>
+              <div class="video-placeholder" id="videoPlaceholder"><div class="placeholder-icon"><svg viewBox="0 0 64 64" fill="none"><rect x="8" y="11" width="48" height="33" rx="5" stroke="currentColor" stroke-width="2"/><path d="M25 52h14M32 45v7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="m27 22 13 6-13 8V22Z" fill="currentColor"/></svg></div><h2>Sua tela, em alta definição</h2><p>Escolha a tela, janela ou aplicativo<br>que deseja transmitir ao vivo.</p><span class="waiting-tag"><span class="sparkle">✦</span> Pronto para começar</span></div>
+              <div class="live-overlay" id="liveOverlay" hidden><span class="live-label"><span></span> AO VIVO</span><span class="timecode" id="timecode">00:00:00</span></div>
+            </div>
+            <div class="video-toolbar"><div class="toolbar-bits"><span class="signal-icon">◉</span><span id="videoQualityLabel">Qualidade automática</span><span class="toolbar-separator">/</span><span id="videoFpsLabel">FPS adaptativo</span></div><button class="icon-button" id="fullscreenPreview" type="button" aria-label="Tela cheia" title="Tela cheia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3"/></svg></button></div>
+          </div>
+
+          <div class="metrics-grid">
+            <div class="metric"><div class="metric-head"><span>RESOLUÇÃO DA CAPTURA</span><span class="metric-icon">▣</span></div><div class="metric-value" id="metricResolution">—<small></small></div><div class="metric-note" id="metricResolutionNote">Aguardando fonte</div></div>
+            <div class="metric"><div class="metric-head"><span>BITRATE TOTAL</span><span class="metric-icon">⌁</span></div><div class="metric-value" id="metricBitrate">0.0 <small>Mbps</small></div><div class="metric-note">Envio aos espectadores</div></div>
+            <div class="metric"><div class="metric-head"><span>ESPECTADORES</span><span class="metric-icon">♧</span></div><div class="metric-value" id="metricViewers">0 <small>online</small></div><div class="metric-note">Conexões na sala</div></div>
+            <div class="metric"><div class="metric-head"><span>CODEC EM USO</span><span class="metric-icon">◈</span></div><div class="metric-value metric-codec" id="metricCodec">—</div><div class="metric-note" id="codecActualNote">Definido por negociação</div></div>
+          </div>
+
+          <div class="room-panel"><div class="room-copy"><div class="room-icon">↗</div><div><strong>Sua sala de transmissão</strong><p>Envie o link para alguém assistir em tempo real.</p></div></div><div class="room-actions"><div class="room-link" id="roomUrlText">Preparando sala...</div><button class="btn btn-outline" type="button" id="copyLinkBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg> Copiar link</button></div></div>
+        </section>
+
+        <aside class="settings panel">
+          <div class="settings-head"><div><span class="panel-heading-title">CONTROLES DE TRANSMISSÃO</span><p>Personalize sua experiência</p></div><span class="settings-gear">⚙</span></div>
+          <div class="field"><div class="field-title"><label for="qualitySelect">Resolução</label><span class="field-helper" id="qualityTag">INTELIGENTE</span></div><select id="qualitySelect"><option value="auto">Automático (máxima disponível)</option><option value="native">Nativa da tela</option><option value="2160">4K UHD · 2160p</option><option value="1440">2K QHD · 1440p</option><option value="1080">Full HD · 1080p</option><option value="720">HD · 720p</option><option value="480">SD · 480p</option></select><p class="field-caption">O modo automático ajusta a qualidade à conexão.</p></div>
+          <div class="field-grid"><div class="field"><label for="fpsSelect">Taxa de quadros</label><select id="fpsSelect"><option value="auto">Automático</option><option value="60">60 FPS</option><option value="30">30 FPS</option><option value="15">15 FPS</option></select></div><div class="field"><label for="codecSelect">Codec de vídeo</label><select id="codecSelect"><option value="auto">Melhor disponível</option><option value="AV1">AV1</option><option value="H265">H.265 / HEVC</option><option value="VP9">VP9</option><option value="H264">H.264 / AVC</option><option value="VP8">VP8</option></select></div></div>
+          <div class="codec-status"><span class="codec-dot"></span><span id="codecInfo">Detectando codecs suportados...</span></div>
+          <div class="field field-bitrate"><div class="field-title"><label for="bitrateRange">Limite de bitrate</label><span class="bitrate-number" id="bitrateValue">Auto</span></div><input id="bitrateRange" type="range" min="0" max="50" step="1" value="0"><div class="range-labels"><span>AUTO</span><span>25 Mbps</span><span>50 Mbps</span></div></div>
+          <div class="settings-rule"></div>
+          <label class="toggle-row" for="audioToggle"><span><strong>Áudio do sistema</strong><small>Compartilhar o som da tela, quando permitido</small></span><span class="switch"><input id="audioToggle" type="checkbox" checked><span class="switch-track"></span></span></label>
+          <label class="toggle-row" for="adaptiveToggle"><span><strong>Qualidade adaptativa</strong><small>Otimizar bitrate por conexão</small></span><span class="switch"><input id="adaptiveToggle" type="checkbox" checked><span class="switch-track"></span></span></label>
+          <div class="action-wrap"><button type="button" class="btn btn-primary btn-start" id="startBtn"><span class="button-broadcast"><span></span><span></span></span><span id="startText">Iniciar transmissão</span><span class="btn-arrow">↗</span></button><button type="button" class="btn btn-stop" id="stopBtn" hidden>■ Encerrar transmissão</button><p class="permission-note"><span>♢</span> Seu navegador solicitará autorização para capturar a tela.</p></div>
+          <div class="tech-note"><span class="tech-icon">✧</span><p><strong>Qualidade com inteligência.</strong> WebRTC prioriza baixa latência e negocia um codec compatível com cada espectador. A aceleração de hardware depende do navegador e da GPU.</p></div>
+        </aside>
+      </div>
+      <section class="compat"><span>TECNOLOGIAS DISPONÍVEIS</span><div class="compat-items" id="codecChips"></div><span class="compat-tail">WEBRTC / P2P <span class="green-square">◆</span></span></section>
+    </main>
+
+    <main id="watchView" hidden>
+      <div class="watch-header"><div><div class="eyebrow"><span class="eyebrow-line"></span> SALA DE TRANSMISSÃO</div><h1>Você está <span class="gradient-text">assistindo.</span></h1><p id="watchSubtitle">Conectando à transmissão ao vivo...</p></div><span id="watchStatus" class="watch-live-badge">AGUARDANDO LIVE</span></div>
+      <section class="panel viewer-panel"><div class="viewer-stage" id="viewerStage"><video id="remoteVideo" autoplay playsinline controls></video><div id="viewerPlaceholder" class="video-placeholder"><div class="placeholder-icon"><svg viewBox="0 0 64 64" fill="none"><rect x="8" y="11" width="48" height="33" rx="5" stroke="currentColor" stroke-width="2"/><path d="M25 52h14M32 45v7" stroke="currentColor" stroke-width="2"/><path d="m27 22 13 6-13 8V22Z" fill="currentColor"/></svg></div><h2>Aguardando o apresentador</h2><p id="viewerMessage">A transmissão aparecerá aqui automaticamente assim que começar.</p></div></div><div class="watch-toolbar"><div class="watch-info"><span class="watch-signal"></span><strong id="watchQuality">Aguardando vídeo</strong><span class="watch-divider">·</span><span id="watchCodec">WebRTC</span></div><div class="watch-controls"><button class="btn btn-outline" type="button" id="soundBtn">Ativar som</button><button class="btn btn-outline" type="button" id="fullscreenWatch">⛶ Tela cheia</button></div></div></section>
+      <div class="watch-bottom"><div class="watch-stat"><small>ESPECTADORES NA SALA</small><strong id="watchViewers">—</strong></div><div class="watch-stat"><small>RESOLUÇÃO RECEBIDA</small><strong id="watchResolution">—</strong></div><div class="watch-stat"><small>CODEC NEGOCIADO</small><strong id="watchActualCodec">—</strong></div><a class="btn btn-outline" href="/">Criar minha transmissão ↗</a></div>
+    </main>
+    <footer class="footer"><span>© LIVEFORGE · TRANSMISSÃO EM TEMPO REAL</span><span>Feito para a melhor experiência possível no seu dispositivo.</span></footer>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
