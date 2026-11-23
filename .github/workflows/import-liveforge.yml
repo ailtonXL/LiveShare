@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
     paths:
-      - liveforge-upload.zip.b64
+      - liveforge-upload.tar.xz.b64
 permissions:
   contents: write
 jobs:
@@ -15,11 +15,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 --decode liveforge-upload.zip.b64 > /tmp/liveforge-upload.zip
+          base64 --decode liveforge-upload.tar.xz.b64 > /tmp/liveforge-upload.tar.xz
           mkdir -p /tmp/liveforge-extract
-          unzip -q /tmp/liveforge-upload.zip -d /tmp/liveforge-extract
+          tar -xJf /tmp/liveforge-upload.tar.xz -C /tmp/liveforge-extract
           cp -a /tmp/liveforge-extract/LiveForge/. .
-          rm liveforge-upload.zip.b64
+          rm liveforge-upload.tar.xz.b64
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
