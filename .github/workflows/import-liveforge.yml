@@ -1,0 +1,27 @@
+name: Import LiveForge project
+on:
+  push:
+    branches: [main]
+    paths:
+      - liveforge-upload.zip.b64
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract source into repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode liveforge-upload.zip.b64 > /tmp/liveforge-upload.zip
+          mkdir -p /tmp/liveforge-extract
+          unzip -q /tmp/liveforge-upload.zip -d /tmp/liveforge-extract
+          cp -a /tmp/liveforge-extract/LiveForge/. .
+          rm liveforge-upload.zip.b64
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Import LiveForge site source files" || exit 0
+          git push
