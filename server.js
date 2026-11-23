@@ -5,6 +5,16 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const PORT = Number(process.env.PORT || 3000);
+const HOST = process.env.HOST || '0.0.0.0';
+const LOCAL_ONLY_STUDIO = process.env.LOCAL_ONLY_STUDIO === '1';
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+function localStudioRequest(req) {
+  const socketAddress = req.socket.remoteAddress || '';
+  const localSocket = socketAddress === '127.0.0.1' || socketAddress === '::1' || socketAddress === '::ffff:127.0.0.1';
+  // O Caddy encaminha o Host publico; o painel deve ser acessado no localhost.
+  const localHost = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(req.headers.host || '');
+  return localSocket && localHost && !req.headers['x-forwarded-for'];
+}
 const MAX_VIEWERS = Number(process.env.MAX_VIEWERS || 12);
 const MAX_ROOMS = Number(process.env.MAX_ROOMS || 100);
 const ROOT = path.resolve(__dirname, 'public');
@@ -48,7 +58,7 @@ async function handler(req,res) {
   if (req.method === 'GET' && url.pathname === '/api/config') {
     const iceServers = [{urls: 'stun:stun.l.google.com:19302'}];
     if(process.env.TURN_URL) iceServers.push({urls:process.env.TURN_URL.split(','),username:process.env.TURN_USERNAME||'',credential:process.env.TURN_CREDENTIAL||''});
-    return send(res,200,{iceServers,maxViewers:MAX_VIEWERS});
+    return send(res,200,{iceServers,maxViewers:MAX_VIEWERS,publicBaseUrl:PUBLIC_BASE_URL,studioLocalOnly:LOCAL_ONLY_STUDIO});
   }
   if (req.method === 'GET' && url.pathname.startsWith('/api/rooms/')) {
     const room=rooms.get(url.pathname.split('/').pop());
@@ -89,6 +99,7 @@ async function handler(req,res) {
   if(req.method === 'POST' && url.pathname.startsWith('/api/')) {
     let data; try { data=await postBody(req); } catch(e) { return send(res,400,{error:e.message}); }
     if(url.pathname==='/api/rooms') {
+      if(LOCAL_ONLY_STUDIO && !localStudioRequest(req)) return send(res,403,{error:'Por seguranca, crie a sala neste PC em http://localhost:3000'});
       if(rooms.size>=MAX_ROOMS) return send(res,503,{error:'Limite de salas alcançado'});
       const id=uid(9), hostToken=uid(24);
       const room={id,hostToken,viewers:new Map(),hostResponse:null,live:false,quality:'Automático',codec:'Automático',createdAt:Date.now()};
@@ -146,7 +157,7 @@ async function handler(req,res) {
 const server=http.createServer((req,res)=> { handler(req,res).catch(e=> {console.error(e);send(res,500,{error:'Erro interno'});}); });
 server.keepAliveTimeout=65_000;
 if (require.main === module) {
-  server.listen(PORT, '0.0.0.0', () => console.log(`LiveForge disponível em http://localhost:${PORT}`));
+  server.listen(PORT, HOST, () => console.log(`LiveForge disponivel em http://${HOST}:${PORT}`));
 }
 module.exports = server;
 setInterval(()=>{

@@ -3,10 +3,18 @@
 const $ = id => document.getElementById(id);
 const codecNames = {AV1:'AV1',H265:'H.265 / HEVC',H264:'H.264 / AVC',VP9:'VP9',VP8:'VP8'};
 const codecMime = {AV1:'video/AV1',H265:'video/H265',H264:'video/H264',VP9:'video/VP9',VP8:'video/VP8'};
-const codecPriority = ['AV1','H265','VP9','H264','VP8'];
+// As opções de CPU/GPU são preferências de codec; WebRTC não fornece uma API
+// universal para obrigar o navegador a usar determinado encoder de hardware.
+const codecPriority = ['H264','H265','AV1','VP9','VP8'];
+const encoderModeOrder = {
+  auto: codecPriority,
+  gpu: ['H264','H265','AV1','VP8','VP9'],
+  cpu: ['AV1','VP9','VP8','H264','H265']
+};
 const qualityNames = {auto:'Automático',native:'Nativa',2160:'4K (2160p)',1440:'1440p',1080:'1080p',720:'720p',480:'480p'};
 const watchId = new URLSearchParams(location.search).get('watch');
 let iceServers = [{urls:'stun:stun.l.google.com:19302'}];
+let publicBaseUrl = ''; // Definido pelo instalador; nunca usa localhost no link do espectador.
 let toastTimeout = 0;
 const supportedVideo = typeof RTCRtpSender !== 'undefined' ? (RTCRtpSender.getCapabilities?.('video')?.codecs || []) : [];
 const receiveVideo = typeof RTCRtpReceiver !== 'undefined' ? (RTCRtpReceiver.getCapabilities?.('video')?.codecs || []) : [];
@@ -26,7 +34,7 @@ async function api(url, data) {
 function topLive(live) { $('topStatus').className='pill '+(live?'pill-live':'pill-idle');$('statusText').textContent=live?'AO VIVO':'OFFLINE'; }
 function formatTime(total) { total=Math.max(0,Math.floor(total));const h=String(Math.floor(total/3600)).padStart(2,'0'),m=String(Math.floor(total/60)%60).padStart(2,'0'),s=String(total%60).padStart(2,'0');return `${h}:${m}:${s}`; }
 function prettyCodec(mime) { if (!mime) return '—';return mime.split('/').pop().toUpperCase().replace('H265','H.265').replace('H264','H.264'); }
-function hostLink() {return `${window.liveForgeDesktop?.shareOrigin || location.origin}/?watch=${encodeURIComponent(host.roomId)}`;}
+function hostLink() {return `${publicBaseUrl || location.origin}/?watch=${encodeURIComponent(host.roomId)}`;}
 function maxHeight() { const q=$('qualitySelect').value;return q==='auto'||q==='native'?Infinity:Number(q); }
 function targetFps() {return $('fpsSelect').value==='auto'?60:Number($('fpsSelect').value);}
 function estimateBitrate(height,fps,codec) {
@@ -34,7 +42,66 @@ function estimateBitrate(height,fps,codec) {
   const factor=({AV1:.66,H265:.77,VP9:.85,H264:1.08,VP8:1.20})[codec]||.90;
   return Math.max(550_000,Math.min(48_000_000,Math.round(6_000_000*area*(fps/30)*factor)));
 }
-function chosenOrder() { const selected=$('codecSelect').value;return selected==='auto'?codecPriority:[selected,...codecPriority.filter(x=>x!==selected)]; }
+function chosenOrder() {
+  const selected=$('codecSelect').value;
+  const preferred=encoderModeOrder[$('encoderModeSelect').value]||codecPriority;
+  return selected==='auto'?preferred:[selected,...preferred.filter(x=>x!==selected)];
+}
+function modeDescription() {
+  const mode=$('encoderModeSelect').value;
+  const msg={
+    auto:'Equilibra compatibilidade e desempenho; H.264 recebe prioridade inicial.',
+    gpu:'Prefere codecs tipicamente acelerados (H.264/H.265). Não é possível forçar GPU pelo WebRTC.',
+    cpu:'Prefere AV1/VP9, que podem usar CPU. Não é possível forçar codificação por software pelo WebRTC.'
+  };
+  $('encoderModeNote').textContent=msg[mode]||msg.auto;
+  $('hardwareSummary').textContent=mode==='auto'?'Codificação escolhida pelo navegador':
+    mode==='gpu'?'Preferência: aceleração por hardware':'Preferência: codificação por software';
+}
+// Nunca inferir GPU apenas pelo codec, nem software apenas pelo nome da placa.
+function classifyEncoder(implementation, powerEfficient) {
+  const raw=String(implementation||'').trim();
+  if (raw) {
+    if (/nvenc|\bamf\b|\bqsv\b|vaapi|video\s*toolbox|videotoolbox|gpu.*video.*accelerator|mediafoundationvideoencodeaccelerator|hardware.*encod|intel.*hardware|d3d11.*encod/i.test(raw))
+      return {kind:'gpu', label:'GPU / hardware',detail:raw};
+    if (/libaom|libvpx|libsvt|svt.av1|openh264|x264|software|\blibaom\b|rav1e/i.test(raw))
+      return {kind:'cpu',label:'CPU / software',detail:raw};
+    return {kind:'unknown',label:'Não identificado',detail:raw};
+  }
+  if (powerEfficient===true) return {kind:'unknown',label:'Eficiente (GPU não confirmada)',detail:'Indicador de eficiência energética; não comprova o uso da GPU'};
+  if (powerEfficient===false) return {kind:'unknown',label:'Não identificado',detail:'Indicador de eficiência baixa; não confirma uso da CPU'};
+  return {kind:'unknown',label:'Não informado pelo navegador',detail:'Consulte chrome://webrtc-internals para dados adicionais'};
+}
+function renderEncoderStats() {
+  const box=$('encoderDetails');
+  if(!box) return;
+  box.replaceChildren();
+  const readings=[...host.peers.entries()].filter(([,p])=>p.pc.signalingState!=='closed').map(([id,p])=>({id,...(p.encoderStats||{})}));
+  const known=readings.filter(r=>r.encoder?.kind&&r.encoder.kind!=='unknown');
+  const labels=[...new Set(known.map(r=>r.encoder.kind))];
+  $('metricEncoder').textContent=!host.live?'—':!readings.length?'Aguardando':
+    known.length!==readings.length?'Não identificado':labels.length===1?(labels[0]==='gpu'?'GPU':'CPU'):'Misto';
+  $('encoderActualNote').textContent=!host.live?'Inicie uma live e conecte um espectador':
+    !readings.length?'Conecte um espectador para medir':known.length===readings.length?'Detectado pela implementação do encoder':'O navegador não informou o suficiente para confirmar';
+  if(!readings.length) {
+    const empty=document.createElement('p');empty.className='encoder-empty';empty.textContent=host.live?'Aguardando conexão de um espectador para ler a codificação real.':'Inicie a transmissão e conecte um espectador para verificar CPU/GPU.';box.append(empty);return;
+  }
+  for(let i=0;i<readings.length;i++) {
+    const r=readings[i],enc=r.encoder||{label:'Aguardando estatísticas',detail:''};
+    const item=document.createElement('div');item.className='encoder-viewer';
+    const title=document.createElement('div');title.className='encoder-viewer-title';
+    const person=document.createElement('strong');person.textContent=`Espectador ${i+1}`;
+    const kind=document.createElement('span');kind.className='encoder-badge '+(enc.kind||'unknown');kind.textContent=enc.label;
+    title.append(person,kind);
+    const summary=document.createElement('p');summary.textContent=[r.codec||'Codec pendente',r.width&&r.height?`${r.width}×${r.height}`:null,Number.isFinite(r.fps)?`${r.fps.toFixed(0)} FPS`:null,Number.isFinite(r.encodeMs)?`${r.encodeMs.toFixed(1)} ms/quadro` : null].filter(Boolean).join(' · ');
+    const detail=document.createElement('small');detail.textContent=enc.detail||'Aguardando informações do encoder';
+    item.append(title,summary,detail);
+    if(r.limitation==='cpu'||r.limitation==='bandwidth'){
+      const warning=document.createElement('small');warning.className='encoder-warning';warning.textContent=r.limitation==='cpu'?'Limitação atual: processamento/CPU':'Limitação atual: banda de rede';item.append(warning);
+    }
+    box.append(item);
+  }
+}
 function codecLabels() { return codecPriority.filter(c=>localCodecs.has(codecMime[c].toLowerCase())); }
 function videoSettings() {return host.stream?.getVideoTracks()[0]?.getSettings()||{};}
 function updateCaptureUi() {
@@ -50,10 +117,7 @@ function updateCaptureUi() {
 function hardwareUi() {
   const platform=navigator.userAgentData?.platform||navigator.platform||'Navegador';
   $('platformName').textContent=platform.replace('Win32','Windows').replace('MacIntel','macOS');
-  $('hardwareSummary').textContent=window.liveForgeDesktop ? 'Codificação gerenciada pelo aplicativo' : 'Codificação gerenciada pelo navegador';
-  if (window.liveForgeDesktop) {
-    $('capturePermission').textContent='Escolha a tela ou janela que deseja compartilhar.';
-  }
+  modeDescription();
   const chips=$('codecChips');
   chips.replaceChildren();
   for(const code of ['AV1','H265','H264','VP9','VP8']) {
@@ -85,7 +149,7 @@ async function sendHostStatus() {
 }
 async function initHost() {
   try {
-    const config=await api('/api/config');iceServers=config.iceServers;
+    const config=await api('/api/config');iceServers=config.iceServers;publicBaseUrl=config.publicBaseUrl||'';
     let cached;try {cached=JSON.parse(sessionStorage.getItem('liveforge-host')||'null');} catch{}
     if(cached?.roomId&&cached?.token) {
       try {await api('/api/rooms/'+encodeURIComponent(cached.roomId));host.roomId=cached.roomId;host.token=cached.token;} catch {}
@@ -132,7 +196,7 @@ function connectHostEvents() {
 async function hostSignal(viewerId,kind,payload) {
   return api('/api/signal',{roomId:host.roomId,role:'host',token:host.token,viewerId,kind,payload});
 }
-function closeHostPeer(id) {const peer=host.peers.get(id);if(!peer)return;peer.pc.onconnectionstatechange=null;peer.pc.close();host.peers.delete(id);}
+function closeHostPeer(id) {const peer=host.peers.get(id);if(!peer)return;peer.pc.onconnectionstatechange=null;peer.pc.close();host.peers.delete(id);renderEncoderStats();}
 function preferVideoCodec(peer) {
   const transceiver=peer.pc.getTransceivers().find(t=>t.sender===peer.videoSender);
   if(!transceiver?.setCodecPreferences || !supportedVideo.length) return;
@@ -148,7 +212,7 @@ async function ensureHostPeer(id,viewerCodecs) {
   if(!host.live||!host.stream) return;
   if(host.peers.has(id)) return;
   const pc=new RTCPeerConnection({iceServers});
-  const entry={pc,viewerCodecs:viewerCodecs||[],videoSender:null,factor:1,lastBytes:null,lastTimestamp:null,negotiating:false,pendingOffer:false,statsCodec:''};
+  const entry={pc,viewerCodecs:viewerCodecs||[],videoSender:null,factor:1,lastBytes:null,lastTimestamp:null,negotiating:false,pendingOffer:false,pendingIce:[],statsCodec:'',encoderStats:null};
   host.peers.set(id,entry);
   try {
     for(const track of host.stream.getTracks()) {const sender=pc.addTrack(track,host.stream);if(track.kind==='video') entry.videoSender=sender;}
@@ -174,9 +238,14 @@ async function handleHostSignal(ev) {
   const peer=host.peers.get(ev.viewerId);if(!peer)return;
   if(ev.kind==='answer') {
     if(peer.pc.signalingState==='have-local-offer') await peer.pc.setRemoteDescription(ev.payload);
+    while(peer.pc.remoteDescription && peer.pendingIce.length) {
+      try {await peer.pc.addIceCandidate(peer.pendingIce.shift());} catch(e) {console.debug('ICE host:',e.message);} 
+    }
     if(peer.pendingOffer && peer.pc.signalingState==='stable') {peer.pendingOffer=false;await offerPeer(ev.viewerId,peer);}
   } else if(ev.kind==='ice') {
-    try {await peer.pc.addIceCandidate(ev.payload);}catch(e){console.debug('ICE host:',e.message);}
+    if(peer.pc.remoteDescription) {
+      try {await peer.pc.addIceCandidate(ev.payload);} catch(e){console.debug('ICE host:',e.message);} 
+    } else peer.pendingIce.push(ev.payload);
   }
 }
 async function applySenderSettings(peer) {
@@ -186,7 +255,7 @@ async function applySenderSettings(peer) {
   const selectedHeight=Math.min(maxHeight(),h);
   const extra=$('adaptiveToggle').checked&&peer.factor<.45?1.35:1;
   const scale=Math.max(1,h/selectedHeight)*extra;
-  const code=$('codecSelect').value==='auto'?codecPriority.find(c=>localCodecs.has(codecMime[c].toLowerCase()))||'H264':$('codecSelect').value;
+  const code=chosenOrder().find(c=>localCodecs.has(codecMime[c].toLowerCase()))||'H264';
   const bitrateOverride=Number($('bitrateRange').value);
   const target=bitrateOverride?bitrateOverride*1_000_000:estimateBitrate(selectedHeight,targetFps(),code);
   const params=peer.videoSender.getParameters();
@@ -245,33 +314,51 @@ async function stopLive() {
   $('preview').srcObject=null;
   $('metricBitrate').innerHTML='0.0 <small>Mbps</small>';
   $('metricCodec').textContent='—';
+  $('codecActualNote').textContent='Definido por negociação';
   $('timecode').textContent='00:00:00';
+  renderEncoderStats();
   showHostUi();await sendHostStatus();notify('Transmissão encerrada. Sua sala continua disponível.');
 }
 async function pollHostStats() {
-  let totalBps=0;let codec='';
+  let totalBps=0;
+  const actualCodecs=new Set();
   for(const peer of host.peers.values()) {
-    if(peer.pc.signalingState==='closed')continue;
+    if(peer.pc.signalingState==='closed'||!peer.videoSender) continue;
     try {
       const stats=await peer.videoSender.getStats();
       for(const item of stats.values()) {
-        if(item.type==='outbound-rtp' && (item.kind==='video'||item.mediaType==='video')) {
-          if(peer.lastTimestamp!==null && item.timestamp>peer.lastTimestamp) totalBps+=Math.max(0,(item.bytesSent-peer.lastBytes)*8*1000/(item.timestamp-peer.lastTimestamp));
-          peer.lastBytes=item.bytesSent;peer.lastTimestamp=item.timestamp;
-          if(item.codecId&&stats.get(item.codecId)) codec=prettyCodec(stats.get(item.codecId).mimeType);
-          if($('adaptiveToggle').checked) {
-            const bandwidthLimited=item.qualityLimitationReason==='bandwidth';
-            const prior=peer.factor;
-            if(bandwidthLimited) peer.factor=Math.max(.22,peer.factor*.84);
-            else peer.factor=Math.min(1,peer.factor*1.06);
-            if(Math.abs(prior-peer.factor)>.015) applySenderSettings(peer).catch(()=>{});
-          } else if(peer.factor!==1) {peer.factor=1;applySenderSettings(peer).catch(()=>{});}
-        }
+        if(item.type!=='outbound-rtp'||(item.kind!=='video'&&item.mediaType!=='video')) continue;
+        if(peer.lastTimestamp!==null&&item.timestamp>peer.lastTimestamp)
+          totalBps+=Math.max(0,(item.bytesSent-peer.lastBytes)*8*1000/(item.timestamp-peer.lastTimestamp));
+        peer.lastBytes=item.bytesSent;peer.lastTimestamp=item.timestamp;
+        const codec=item.codecId&&stats.get(item.codecId)?prettyCodec(stats.get(item.codecId).mimeType):'';
+        if(codec)actualCodecs.add(codec);
+        const implementation=typeof item.encoderImplementation==='string'?item.encoderImplementation:'';
+        const powerEfficient=typeof item.powerEfficientEncoder==='boolean'?item.powerEfficientEncoder:undefined;
+        peer.encoderStats={
+          codec:codec||peer.encoderStats?.codec||'',
+          encoder:classifyEncoder(implementation,powerEfficient),
+          width:item.frameWidth,height:item.frameHeight,
+          fps:Number.isFinite(item.framesPerSecond)?item.framesPerSecond:null,
+          encodeMs:Number.isFinite(item.totalEncodeTime)&&item.framesEncoded>0?item.totalEncodeTime*1000/item.framesEncoded:null,
+          limitation:item.qualityLimitationReason||'none'
+        };
+        if($('adaptiveToggle').checked){
+          const bandwidthLimited=item.qualityLimitationReason==='bandwidth';
+          const prior=peer.factor;
+          if(bandwidthLimited)peer.factor=Math.max(.22,peer.factor*.84);
+          else peer.factor=Math.min(1,peer.factor*1.06);
+          if(Math.abs(prior-peer.factor)>.015)applySenderSettings(peer).catch(()=>{});
+        }else if(peer.factor!==1){peer.factor=1;applySenderSettings(peer).catch(()=>{});}
       }
-    } catch(e) {console.debug(e.message);}
+    }catch(e){console.debug(e.message);}
   }
   $('metricBitrate').innerHTML=`${(totalBps/1e6).toFixed(1)} <small>Mbps</small>`;
-  if(codec) {$('metricCodec').textContent=codec;$('codecActualNote').textContent='Conexão WebRTC negociada';}
+  if(actualCodecs.size){
+    $('metricCodec').textContent=actualCodecs.size===1?[...actualCodecs][0]:'Múltiplos';
+    $('codecActualNote').textContent='Codec realmente negociado';
+  }
+  renderEncoderStats();
 }
 async function copyLink() {
   if(!host.roomId) {notify('Sala ainda não foi criada.',true);return;}
@@ -287,6 +374,11 @@ function setupStudio() {
   $('fullscreenPreview').addEventListener('click',()=>{$('videoFrame').requestFullscreen?.().catch(()=>{});});
   for(const id of ['qualitySelect','fpsSelect','adaptiveToggle','bitrateRange']) $(id).addEventListener('change',()=>applyAllSettings());
   $('codecSelect').addEventListener('change',()=>applyAllSettings(true));
+  $('encoderModeSelect').addEventListener('change',()=>{
+    modeDescription();
+    applyAllSettings(true);
+  });
+  renderEncoderStats();
   initHost();
 }
 

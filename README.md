@@ -12,25 +12,21 @@ npm start
 
 Ou `node server.js`. Abra **http://localhost:3000** no computador transmissor. Clique em **Iniciar transmissão**, permita a captura da tela e envie o link da sala aos espectadores.
 
+### Instalação automática no Windows
+
+1. Extraia todo o arquivo ZIP.
+2. Abra a pasta `LiveForge` e execute **`instalar.bat`** com um duplo clique, escolhendo **[3] Somente local** (ou diretamente `instalar_local.bat`).
+3. Caso o Node.js 20+ não esteja disponível, o instalador tenta instalar a versão LTS usando o **winget** (o Windows pode solicitar confirmação ou privilégios). Se o winget não estiver disponível, ele abre a página oficial do Node.js para instalação manual.
+4. O instalador local tenta criar um atalho **LiveForge Studio** na área de trabalho. Ao final, escolha se deseja iniciar o site.
+5. Para iniciar novamente depois, use o atalho ou o arquivo `iniciar_windows.bat`. O site fica disponível em **http://localhost:3000** enquanto o servidor estiver em execução.
+
+**Observação:** o projeto não exige `npm install`: ele usa apenas recursos nativos do Node.js. O instalador não configura um serviço do Windows, HTTPS nem acesso remoto público automaticamente. Para compartilhar a transmissão com outros dispositivos fora de `localhost`, consulte a seção de publicação abaixo.
+
 ## Aplicativo para Windows 10 e 11 (64 bits)
 
-1. Abra a [página de builds para Windows](https://github.com/ailtonXL/LiveShare/actions/workflows/windows-desktop.yml) com sua conta do GitHub.
-2. Abra uma execução concluída e baixe **LiveForge-Studio-Windows-x64** na seção **Artifacts**.
-3. Extraia o ZIP e execute **LiveForge-Studio-Setup-x64.exe**. Abra **LiveForge Studio** pelo menu Iniciar.
+A versão desktop (Electron) foi preservada no repositório GitHub. Acesse o [workflow de build para Windows](https://github.com/ailtonXL/LiveShare/actions/workflows/windows-desktop.yml), baixe o artefato gerado e instale o aplicativo. Para compilar localmente, execute `npm ci` e `npm run dist:win`.
 
-O aplicativo inclui o runtime e inicia a sinalização ao abrir. Escolha uma tela ou janela e copie o link da sala. Na mesma rede local, os espectadores abrem esse link no navegador. O computador transmissor precisa permanecer ligado e com o aplicativo aberto. O Firewall do Windows pode pedir permissão para receber conexões na rede privada.
-
-Por padrão, o aplicativo escolhe uma porta disponível e usa o primeiro endereço IPv4 de rede para gerar o link. Para publicar a aplicação desktop na internet, fixe a porta com `PORT`, configure o proxy HTTPS para essa porta e defina `LIVEFORGE_PUBLIC_URL` como a origem pública do proxy. Use TURN quando a conexão P2P exigir retransmissão. O áudio do sistema no aplicativo Windows é oferecido ao compartilhar uma tela inteira.
-
-Para desenvolver ou gerar um instalador no Windows, use Node.js 20 ou mais recente:
-
-```bash
-npm ci
-npm run desktop
-npm run dist:win
-```
-
-O instalador gerado fica em `dist/LiveForge-Studio-Setup-x64.exe`. O site original continua disponível via `npm start`. Os arquivos BAT existentes iniciam essa versão web.
+O aplicativo também utiliza o servidor Node.js, inicializado internamente. Para expor transmissões fora da rede local, use HTTPS e, quando necessário, um servidor TURN.
 
 ## Opções de ambiente
 
@@ -71,7 +67,7 @@ $env:PORT='3000'; npm start
 
 1. Instale Node.js 20+ em uma VPS, servidor ou computador acessível.
 2. Execute `npm start`.
-3. Configure um domínio e um proxy reverso HTTPS. Há um exemplo em `Caddyfile.example`.
+3. Configure HTTPS por domínio e proxy reverso (`Caddyfile.example`) **ou**, no Windows, utilize a nova instalação por IP público descrita no fim deste arquivo.
 4. Se os usuários estiverem atrás de NATs restritivos, configure suas credenciais TURN com as variáveis acima.
 5. Libere as portas do proxy HTTPS (443/TCP) e as portas UDP necessárias ao serviço TURN.
 
@@ -83,3 +79,55 @@ Você também pode gerar a imagem com `docker build -t liveforge .` e executá-l
 - `public/index.html`: interface de estúdio/espectador
 - `public/styles.css`: aparência responsiva
 - `public/app.js`: captura, negociação, codecs, qualidade adaptativa, UI e estatísticas
+
+## Publicar pelo seu proprio IP publico, sem dominio (Windows + AX3000)
+
+**`instalar.bat` permite tres modos:** [1] HTTPS (80/443 TCP), [2] somente HTTP na porta 3000 TCP (mais simples, menos seguro), [3] uso local. Tambem e possivel executar `instalar_local.bat` diretamente.
+
+1. Extraia **todo** o ZIP em uma pasta normal, sem executar o BAT de dentro do ZIP.
+2. Clique duas vezes em `instalar.bat` e escolha **[1] acesso publico HTTPS**.
+3. Confirme a instalacao com permissao de administrador. O script `configurar_acesso_publico.ps1` tenta instalar Node.js LTS e Caddy usando **winget**, pede confirmacao do seu IPv4 publico, gera o Caddyfile e abre apenas TCP 80 e 443 no Firewall do Windows. O Caddy deve ser **2.11+**.
+4. No AX3000, reserve o IP local do PC, depois encaminhe **TCP 80 -> PC:80** e **TCP 443 -> PC:443**. Veja `guia_roteador_AX3000.txt`.
+5. Execute `iniciar_publico.bat` ou use o atalho **LiveForge Publico**. Mantenha **as duas janelas** (Node e Caddy) abertas.
+6. Abra **http://localhost:3000** no computador transmissor, inicie a captura e copie o link `https://SEU_IP_PUBLICO/?watch=CODIGO` gerado para o amigo.
+7. Peça a ele para abrir em outra conexao de internet, como **4G/5G**, e confirme no navegador que o certificado HTTPS foi emitido com sucesso (nao aceite avisos de certificado invalido).
+
+**Certificado de IP confiavel:** desde janeiro de 2026, o Let's Encrypt permite certificados para IP publico com validade curta (aprox. 6 dias); o Caddy **2.11+** configurado com `issuer acme { profile shortlived }` solicita e renova automaticamente esses certificados. O IP WAN do roteador deve coincidir com o IP publico informado e as portas 80/443 precisam estar acessiveis da Internet. Nao ha certeza de emissao em redes com portas bloqueadas ou duplo NAT. **O instalador nao acessa nem modifica automaticamente o roteador.**
+
+**Protecao:** neste modo, `server.js` escuta apenas em `127.0.0.1:3000` e a criacao de salas fica restrita a requisicoes locais no `localhost`. Caddy publica somente o frontend e as APIs necessarias a visualizacao/sinalizacao. Nao encaminhe a porta 3000. Para remover as regras de firewall ao parar de usar o projeto, remova manualmente as duas regras nomeadas `LiveForge Studio HTTPS TCP 80` e `LiveForge Studio HTTPS TCP 443` (ou use o script de remocao apos validar os comandos na sua maquina).
+
+**Limites:** nao ha configuracao automatica de TURN, login ou moderacao. Com NAT restritivo pode haver site acessivel sem video WebRTC. A live usa upload de video separado para cada amigo. A operadora pode bloquear as portas 80/443 e seu IP pode mudar. O acesso a `localhost` no PC transmissor continua funcional mesmo antes da emissao do certificado; a URL publica depende de HTTPS com certificado valido. O comportamento nao foi validado num roteador ou Windows reais neste ambiente de criacao.
+
+
+## Opcao [2] - Somente porta 3000 TCP (HTTP, sem dominio)
+
+Essa opcao foi adicionada para quem deseja encaminhar **apenas TCP 3000** no roteador AX3000.
+
+1. Descompacte o ZIP, execute `instalar.bat` e escolha **[2] Somente TCP 3000** (ou `instalar_porta_3000.bat`).
+2. Aceite a permissao de administrador para instalar/verificar Node.js 20+ e liberar TCP 3000 no Firewall do Windows. Nenhuma instalacao do Caddy e necessaria nesse modo.
+3. Informe/valide seu IPv4 publico; o script mostra IPs locais do computador. Confirme que o endereco WAN do roteador coincide com o IPv4 publico informado.
+4. No AX3000, reserve o IPv4 local do PC e crie **uma unica regra: TCP 3000 externa -> TCP 3000 interna**, para o IP local do PC.
+5. Execute `iniciar_porta_3000.bat` ou o atalho **LiveForge Porta 3000**. Nao execute simultaneamente o modo HTTPS/local, pois usam a mesma porta interna 3000.
+6. **Voce compartilha a tela abrindo `http://localhost:3000` no seu proprio computador.** Essa origem local pode acessar `getDisplayMedia()`; a pagina HTTP pelo IP publico nao e um contexto seguro para iniciar a captura.
+7. O link copiado pelo estúdio usa `http://SEU_IP_PUBLICO:3000/?watch=CODIGO` para o amigo assistir. Teste a partir de outra conexao (por exemplo, dados moveis).
+
+**Restricoes importantes:** O site e sua sinalizacao via HTTP **nao tem HTTPS nem criptografia de transporte web**. Nao e recomendavel para publicacao permanente ou usuarios desconhecidos, pois intermediarios podem inspecionar ou adulterar a pagina e a sinalizacao. O WebRTC usa criptografia na midia peer-to-peer, mas nao resolve os riscos de HTTP. Use [1] HTTPS para uma publicacao mais segura. A criacao de salas fica restrita ao localhost no modo [2], mas nao substitui autenticacao e protecoes de producao.
+
+**Conectividade de video:** encaminhar TCP 3000 permite acesso ao site e a sinalizacao. Conexoes WebRTC P2P negociam conectividade separadamente (normalmente por UDP atraves de STUN). Algumas redes exigem TURN. Uma unica porta nao e garantia de video em todas as redes.
+
+**Se mudar de modo:** Pare as instancias antigas e retire os encaminhamentos nao utilizados do AX3000. Use `remover_regra_3000.bat` para apagar somente a regra de Firewall criada pelo modo [2]. Se o IP publico mudar, repita a instalacao [2] para atualizar o link. O programa nao altera as configuracoes do AX3000 automaticamente. Essa rotina nao foi executada em um computador Windows real neste ambiente.
+
+
+## Novo em 1.1: Preferência de codificação e diagnóstico CPU/GPU
+
+No painel **Codificação · CPU / GPU**, escolha:
+
+- **Automático:** usa prioridade conservadora H.264/H.265 para manter compatibilidade e reduzir o risco de sobrecarga em GPUs antigas.
+- **Preferir GPU:** coloca H.264/H.265 à frente (podem receber aceleração por hardware, conforme a máquina).
+- **Preferir CPU:** coloca AV1/VP9 à frente (podem ser codificados por software, conforme a máquina).
+
+**Limitação fundamental:** essas escolhas só mudam **a prioridade dos codecs WebRTC**, não selecionam o chip diretamente. Um navegador pode escolher GPU mesmo na preferência CPU e pode usar CPU mesmo na preferência GPU. A seleção manual de codec continua tendo prioridade sobre o perfil. Não existe uma API padrão amplamente suportada para forçar o encoder de WebRTC pelo JavaScript do site. O `hardwareAcceleration` do WebCodecs não controla automaticamente o pipeline WebRTC deste projeto.
+
+O **Diagnóstico de codificação** lê `RTCRtpSender.getStats()` a cada 4 segundos, **quando pelo menos um espectador está conectado**, e mostra o codec realmente negociado, dimensões enviadas, FPS, tempo médio por quadro e `encoderImplementation`/`powerEfficientEncoder` se presentes. Só mostra **GPU** ou **CPU** como identificados se o navegador informar um nome de implementação reconhecível. Se não houver dados confiáveis, apresenta **Não identificado pelo navegador**; um indicador de eficiência energética isolado não prova aceleração de GPU. Para depurar, abra `chrome://webrtc-internals` no Chrome.
+
+Para RX 580, teste primeiro **Preferir GPU + codec H.264**; comparar CPU e FPS do jogo com AV1 não garante que AV1 esteja sendo codificado pela CPU. Para **forçar** AMD AMF/NVIDIA NVENC/Intel Quick Sync ou encoder de CPU, uma versão futura precisaria de um componente nativo, como FFmpeg/GStreamer ou aplicativo desktop, com pipeline de transmissão integrado; este MVP continua 100% WebRTC pelo navegador.

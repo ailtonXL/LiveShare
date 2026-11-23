@@ -1,0 +1,52 @@
+LIVEFORGE STUDIO - REGRAS DO AX3000 PARA IP PUBLICO
+===================================================
+
+OPCAO [2] SOMENTE PORTA 3000 TCP - MAIS SIMPLES (HTTP)
+----------------------------------------------------
+1. Instale com instalar.bat e escolha [2].
+2. No AX3000, reserve IP local do PC via DHCP (ex. 192.168.1.100).
+3. Abra NAT / Servidor Virtual / Encaminhamento de Portas.
+4. Crie UMA regra:
+      Nome: LiveForge-3000
+      IP interno: IP local do PC
+      Porta externa: 3000
+      Porta interna: 3000
+      Protocolo: TCP
+5. Execute iniciar_porta_3000.bat.
+6. No computador transmissor, abra http://localhost:3000.
+   Capture sua tela e copie o link da sala.
+7. Seu amigo usa http://SEU_IP_PUBLICO:3000/?watch=CODIGO
+   no navegador, testando pelo 4G/5G fora da sua rede.
+
+IMPORTANTE:
+- Esse modo nao usa HTTPS: trafego web e sinalizacao nao criptografados.
+- http://SEU_IP:3000 NAO serve para iniciar a captura de tela. Use localhost.
+- O video WebRTC e criptografado entre os participantes, mas o HTTP
+  da pagina/sinalizacao continua vulneravel a interceptacao e alteracao.
+- A porta TCP 3000 abre o site, nao garante que o video P2P conecte.
+- Algumas redes exigem TURN, que pode usar portas adicionais.
+- Ao terminar, feche o BAT e remova a regra de NAT se nao for usar.
+- Para remover a regra do Firewall use remover_regra_3000.bat.
+
+OPCAO [1] HTTPS COM CERTIFICADO PARA IP PUBLICO - MAIS SEGURO
+----------------------------------------------------------
+1. Instale com instalar.bat e escolha [1].
+2. Reserve o IP local do PC no AX3000.
+3. Crie DUAS regras, sempre TCP e com o mesmo IP local do PC:
+      Externa 80  -> Interna 80
+      Externa 443 -> Interna 443
+4. Execute iniciar_publico.bat (Node + Caddy HTTPS).
+5. Emita pelo http://localhost:3000 e envie link https://SEU_IP/?watch=...
+6. Caddy precisa emitir/renovar certificado IP, acesso externo e
+   IP WAN publico coincidente. Consulte README.md.
+
+DICAS PARA AMBOS OS MODOS
+------------------------
+- Compare o IP WAN do AX3000 ao IP publico detectado; caso diferente,
+  pode haver CGNAT ou outro roteador na frente.
+- Confira o Firewall do Windows, reserva de DHCP e se o programa esta aberto.
+- Testar IP publico dentro do mesmo Wi-Fi pode falhar por NAT hairpin.
+- Nao abra portas 22, 3389 ou faixas UDP aleatorias para o LiveForge.
+- Se voce usava [1] e muda para [2], pare o Caddy e retire as regras
+  antigas 80/443 no roteador, se nao tiver mais necessidade.
+- Nao ative DMZ e evite UPnP indiscriminado.

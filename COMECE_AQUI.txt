@@ -1,0 +1,30 @@
+LIVEFORGE STUDIO - INSTALADOR WINDOWS / IP PUBLICO
+=====================================================
+
+1) Extraia todo o ZIP em uma pasta.
+2) Abra instalar.bat.
+3) Escolha uma opcao:
+   [1] HTTPS (mais seguro): portas TCP 80 e 443 no AX3000.
+   [2] SOMENTE PORTA 3000 (HTTP): so TCP 3000 no AX3000.
+   [3] Somente local: nao abre portas no roteador.
+
+MODO [2] (SOLICITADO):
+- Confirme seu IP publico com o IP WAN do AX3000.
+- Reserve um IPv4 local fixo para seu computador no roteador.
+- Encaminhe TCP 3000 externa para TCP 3000 nesse IPv4 local.
+- O instalador libera a regra TCP 3000 no Firewall do Windows.
+- Execute iniciar_porta_3000.bat ou o atalho da area de trabalho.
+- TRANSMISSOR: abra http://localhost:3000 no PROPRIO computador.
+- ESPECTADOR: recebe http://SEU_IP_PUBLICO:3000/?watch=CODIGO
+- Teste usando celular no 4G/5G, nao apenas no Wi-Fi de casa.
+
+ATENCAO: esta opcao transmite a pagina e a sinalizacao em HTTP, sem
+certificado TLS. Nao e recomendada para uso publico permanente.
+A captura de tela exige contexto seguro: o apresentador so deve
+iniciar a live pelo localhost nesse modo. Na rede do amigo o site
+pode abrir, mas o WebRTC P2P ainda depende da conectividade entre
+as redes (STUN/TURN). Abrir 3000 nao garante conectividade do video.
+
+O BAT nao muda o AX3000 automaticamente. Se seu IP publico mudar,
+rode instalar.bat novamente e escolha [2] para atualizar o link.
+Veja guia_roteador_AX3000.txt e README.md para detalhes.

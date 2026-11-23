@@ -2,5 +2,8 @@ node_modules/
 .DS_Store
 *.log
 .env
+Caddyfile.publico
+.liveforge-publico.cmd
 
+.liveforge-porta3000.cmd
 dist/
